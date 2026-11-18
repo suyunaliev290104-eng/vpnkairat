@@ -21,6 +21,9 @@ async def remind(s: AsyncSession, notifier: Notifier) -> None:
         Subscription.notified_1d.is_(False),
     ))
     for sub in list(subs):
+        await s.refresh(sub)  # may have been renewed since the query ran
+        if sub.notified_1d or not sub.expires or not (now < sub.expires <= now + timedelta(days=3)):
+            continue
         user = await s.get(User, sub.user_id)
         if sub.expires - now <= timedelta(days=1):
             sub.notified_1d = sub.notified_3d = True
@@ -37,6 +40,9 @@ async def expire(s: AsyncSession, vpn: VpnProvider, notifier: Notifier) -> None:
         Subscription.notified_expired.is_(False),
     ))
     for sub in list(subs):
+        await s.refresh(sub)
+        if sub.notified_expired or sub.is_active:
+            continue
         user = await s.get(User, sub.user_id)
         await sync_user(s, user, vpn)
         sub.notified_expired = True

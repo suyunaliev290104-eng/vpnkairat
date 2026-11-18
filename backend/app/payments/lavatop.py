@@ -21,7 +21,7 @@ from app.config import Settings, get_settings
 from app.models import Payment, User
 from app.payments.base import InvoiceResult, PaymentProvider, WebhookRejected, WebhookResult
 from app.payments.registry import register
-from app.plans import Plan
+from app.plans import PLANS, Plan
 
 API = "https://gate.lava.top"
 PAID_STATUSES = {"completed", "subscription-active"}
@@ -38,7 +38,8 @@ class LavaTopProvider(PaymentProvider):
         return plan.rub
 
     def enabled(self, settings: Settings) -> bool:
-        return bool(settings.lavatop_api_key and settings.lavatop_offers)
+        offers = settings.lavatop_offers
+        return bool(settings.lavatop_api_key) and all(offers.get(pid) for pid in PLANS)
 
     async def create_invoice(self, payment: Payment, plan: Plan, user: User) -> InvoiceResult:
         if not user.email:

@@ -54,7 +54,10 @@ class CryptoBotProvider(PaymentProvider):
     async def parse_webhook(self, request: Request) -> WebhookResult:
         body = await request.body()
         sig = request.headers.get("crypto-pay-api-signature", "")
-        secret = hashlib.sha256(get_settings().cryptobot_token.encode()).digest()
+        token = get_settings().cryptobot_token
+        if not token:
+            raise WebhookRejected("cryptobot not configured")
+        secret = hashlib.sha256(token.encode()).digest()
         expected = hmac.new(secret, body, hashlib.sha256).hexdigest()
         if not sig or not hmac.compare_digest(sig, expected):
             raise WebhookRejected("bad signature")

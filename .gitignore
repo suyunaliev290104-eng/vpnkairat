@@ -7,3 +7,4 @@ webapp/dist/
 .env
 *.db
 .pytest_cache/
+*.egg-info/

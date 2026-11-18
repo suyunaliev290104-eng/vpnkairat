@@ -1,4 +1,5 @@
 import json
+import ssl
 from contextlib import asynccontextmanager
 
 import httpx
@@ -17,9 +18,19 @@ class XuiProvider:
     def __init__(self, timeout: float = 15.0):
         self.timeout = timeout
 
+    @staticmethod
+    def _verify(server: Server) -> ssl.SSLContext | bool:
+        """Pin the panel's self-signed cert (panels are reached by IP, so no hostname check)."""
+        if not server.panel_cert:
+            return True
+        ctx = ssl.create_default_context(cadata=server.panel_cert)
+        ctx.check_hostname = False
+        return ctx
+
     @asynccontextmanager
     async def _client(self, server: Server):
-        async with httpx.AsyncClient(base_url=server.panel_url.rstrip("/"), timeout=self.timeout) as c:
+        async with httpx.AsyncClient(base_url=server.panel_url.rstrip("/"), timeout=self.timeout,
+                                     verify=self._verify(server)) as c:
             r = await c.post("/login", data={"username": server.username, "password": server.password})
             if r.status_code != 200 or not r.json().get("success"):
                 raise XuiError(f"login failed on {server.name}")

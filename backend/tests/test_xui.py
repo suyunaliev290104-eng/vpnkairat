@@ -53,3 +53,19 @@ async def test_get_traffic():
     respx.get("https://p.example/base/panel/api/inbounds/getClientTraffics/tg42").mock(
         return_value=httpx.Response(200, json={"success": True, "obj": {"up": 5, "down": 10}}))
     assert await XuiProvider().get_traffic(SRV, "tg42") == (5, 10)
+
+
+# I-4: panel over HTTPS with a pinned self-signed certificate
+def test_pinned_cert_builds_ssl_context():
+    import ssl
+    import subprocess
+    import tempfile
+    d = tempfile.mkdtemp()
+    subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-subj", "/CN=x",
+                    "-keyout", f"{d}/k", "-out", f"{d}/c"], check=True, capture_output=True)
+    pem = open(f"{d}/c").read()
+    srv = Server(name="NL", panel_url="https://1.2.3.4:2053/p", username="a", password="b", inbound_id=1,
+                 host="h", port=443, reality_pbk="k", reality_sni="s", panel_cert=pem)
+    ctx = XuiProvider._verify(srv)
+    assert isinstance(ctx, ssl.SSLContext) and ctx.verify_mode == ssl.CERT_REQUIRED and ctx.check_hostname is False
+    assert XuiProvider._verify(SRV) is True

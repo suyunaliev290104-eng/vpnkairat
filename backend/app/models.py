@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -69,6 +69,8 @@ class Server(Base):
     reality_sni: Mapped[str] = mapped_column(String(255))
     reality_sid: Mapped[str] = mapped_column(String(32), default="")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # PEM of the panel's self-signed TLS cert; pinned when talking to the panel over https
+    panel_cert: Mapped[str | None] = mapped_column(Text)
 
 
 class Payment(Base):

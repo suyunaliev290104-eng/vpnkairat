@@ -64,20 +64,26 @@ async def mark_paid(
     values = {"status": "paid", "paid_at": utcnow()}
     if payment_id is not None and provider_payment_id:
         values["provider_payment_id"] = provider_payment_id
-    res = await s.execute(
-        update(Payment)
-        .where(cond, Payment.provider == provider_name, Payment.status == "pending")
-        .values(**values)
-        .execution_options(synchronize_session=False)
-    )
-    await s.commit()
-    if res.rowcount != 1:
-        return None
-
-    payment = await s.scalar(select(Payment).where(cond).execution_options(populate_existing=True))
-    user = await s.get(User, payment.user_id)
-    plan = PLANS[payment.plan_id]
-    sub = await extend(s, user, plan.days)
+    try:
+        res = await s.execute(
+            update(Payment)
+            .where(cond, Payment.provider == provider_name, Payment.status == "pending")
+            .values(**values)
+            .execution_options(synchronize_session=False)
+        )
+        if res.rowcount != 1:
+            await s.commit()  # nothing changed; end the transaction without expiring loaded objects
+            return None
+        payment = await s.scalar(select(Payment).where(cond).execution_options(populate_existing=True))
+        user = await s.get(User, payment.user_id)
+        plan = PLANS[payment.plan_id]
+        # Payment status and granted days commit atomically: a crash in between leaves it pending,
+        # so the provider's retry grants the days.
+        sub = await extend(s, user, plan.days, commit=False)
+        await s.commit()
+    except Exception:
+        await s.rollback()
+        raise
     await sync_user(s, user, vpn)
     await _safe_notify(notifier, user.tg_id, notify.paid(plan, sub.expires))
 
