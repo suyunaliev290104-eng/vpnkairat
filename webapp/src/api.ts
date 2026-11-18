@@ -22,7 +22,7 @@ export interface PlanDto {
   discount: number; per_month_rub: number; prices: Record<string, Price>;
 }
 export interface ProviderDto { name: string; title: string; currency: string; kind: "link" | "invoice"; needs_email: boolean }
-export interface PlansResp { plans: PlanDto[]; providers: ProviderDto[] }
+export interface PlansResp { plans: PlanDto[]; providers: ProviderDto[]; stars_shop_url: string }
 export interface PayResp { payment_id: number; payment_url: string; kind: "link" | "invoice" }
 export interface RefResp { link: string; invited: number; bonus_days: number }
 

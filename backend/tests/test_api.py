@@ -48,6 +48,7 @@ async def client(tmp_path, monkeypatch):
     monkeypatch.setattr(s, "lavatop_webhook_secret", "WH")
     monkeypatch.setattr(s, "lavatop_offers", {"m1": "o1", "m3": "o3", "m6": "o6", "m12": "o12"})
     monkeypatch.setattr(s, "cryptobot_token", "")
+    monkeypatch.setattr(s, "stars_shop_url", "https://t.me/QuickStars_bot?start=628539345")
     setup_db(f"sqlite+aiosqlite:///{tmp_path}/t.db")
     await init_db()
     monkeypatch.setattr(ctx, "vpn", FakeVpn())
@@ -100,6 +101,7 @@ async def test_plans(client):
     assert "stars" in names and "lavatop" in names and "cryptobot" not in names
     lava = next(p for p in d["providers"] if p["name"] == "lavatop")
     assert lava["needs_email"] is True and lava["kind"] == "link"
+    assert d["stars_shop_url"] == "https://t.me/QuickStars_bot?start=628539345"
 
 
 async def test_trial_once(client):

@@ -127,3 +127,9 @@ h2, h3 { margin: 0; }
 .bar.dark { background: var(--bg); margin: 0; }
 .bar.dark > div { background: var(--green); }
 .bypass-meta { display: flex; justify-content: space-between; font-size: 13px; flex-wrap: wrap; gap: 4px; }
+
+/* stars shop hint */
+.stars-shop { display: flex; flex-direction: column; gap: 10px; }
+.stars-shop-text { display: flex; flex-direction: column; }
+.stars-shop .btn { min-height: 44px; background: var(--bg); }
+.stars-shop.attn { box-shadow: 0 0 0 2px #f5b301 inset; }

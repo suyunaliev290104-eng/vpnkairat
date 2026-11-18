@@ -89,6 +89,7 @@ async def plans(user: User = Depends(current_user)):
              "needs_email": p.needs_email}
             for p in providers
         ],
+        "stars_shop_url": get_settings().stars_shop_url,
     }
 
 

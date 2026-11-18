@@ -13,6 +13,7 @@ export function Plans({ me, setMe, onPaid }: { me: Me; setMe: (m: Me) => void; o
   const [email, setEmail] = useState(me.user.email ?? "");
   const [busy, setBusy] = useState(false);
   const [waiting, setWaiting] = useState(false);
+  const [starsCancelled, setStarsCancelled] = useState(false);
   const startExpiry = useRef(me.subscription.expires_at);
 
   useEffect(() => {
@@ -57,7 +58,10 @@ export function Plans({ me, setMe, onPaid }: { me: Me; setMe: (m: Me) => void; o
       }
       const r = await api.pay(planId, provider);
       if (r.kind === "invoice") {
-        tg.openInvoice(r.payment_url, (status) => { if (status === "paid") setWaiting(true); });
+        tg.openInvoice(r.payment_url, (status) => {
+          if (status === "paid") setWaiting(true);
+          else if (status === "cancelled" || status === "failed") setStarsCancelled(true);
+        });
       } else {
         tg.openLink(r.payment_url);
         setWaiting(true);
@@ -107,6 +111,16 @@ export function Plans({ me, setMe, onPaid }: { me: Me; setMe: (m: Me) => void; o
           </button>
         ))}
       </Card>
+
+      {provider === "stars" && data.stars_shop_url && (
+        <Card className={`stars-shop ${starsCancelled ? "attn" : ""}`}>
+          <div className="stars-shop-text">
+            <span className="row-title">{starsCancelled ? "Не хватило звёзд?" : "Нет звёзд?"}</span>
+            <span className="row-sub">Купите их выгоднее, чем в самом Telegram, — по карте или СБП</span>
+          </div>
+          <Button variant="secondary" onClick={() => tg.openTelegramLink(data.stars_shop_url)}>⭐ Купить звёзды</Button>
+        </Card>
+      )}
 
       {needEmail && (
         <Card>
