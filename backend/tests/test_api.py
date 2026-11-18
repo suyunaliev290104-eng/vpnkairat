@@ -221,3 +221,14 @@ async def test_me_bypass_usage(client):
     assert d["bypass"] == {"available": True, "used_today": 3000, "limit": 5 * 1024 ** 3}
     assert d["subscription"]["traffic_used"] == 3300
     assert [s["kind"] for s in d["servers"]] == ["direct", "bypass"]
+
+
+async def test_sub_sends_happ_routing_header(client, monkeypatch):
+    await add_server()
+    await client.post("/api/trial", headers=auth())
+    token = (await client.get("/api/me", headers=auth())).json()["subscription"]["sub_url"].rsplit("/", 1)[1]
+    r = await client.get(f"/sub/{token}")
+    assert r.headers["routing"].startswith("happ://routing/onadd/")
+    monkeypatch.setattr(get_settings(), "split_routing", False)
+    r = await client.get(f"/sub/{token}")
+    assert "routing" not in r.headers

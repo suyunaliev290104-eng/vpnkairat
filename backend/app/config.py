@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     referral_bonus_days: int = 7
     device_limit: int = 3
     bypass_daily_gb: int = 5
+    split_routing: bool = True  # Happ: Russian sites direct, the rest via VPN
     # Where to send users who lack Telegram Stars (e.g. your referral link in a Stars shop bot)
     stars_shop_url: str = "https://t.me/QuickStars_bot?start=628539345"
     support_username: str = ""

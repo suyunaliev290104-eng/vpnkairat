@@ -81,6 +81,12 @@ export function Connect({ me, go }: { me: Me; go: (s: "plans") => void }) {
         <div className="step-body">
           <div className="step-title">Включите VPN</div>
           <p className="muted small">Выберите любую локацию и нажмите кнопку подключения в приложении. Готово 🎉</p>
+          {app.id === "happ" && (
+            <p className="muted small">
+              🇷🇺 В Happ российские сайты — банки, Госуслуги, маркетплейсы — автоматически открываются
+              без VPN, остальное идёт через VPN. Ничего настраивать не нужно.
+            </p>
+          )}
           {me.bypass.available && (
             <p className="muted small">
               🛡 Если мобильный интернет работает только по белым спискам, выберите в приложении сервер

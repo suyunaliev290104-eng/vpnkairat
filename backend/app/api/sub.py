@@ -10,6 +10,7 @@ from app.api.auth import get_session
 from app.config import get_settings
 from app.models import Subscription
 from app.vpn.links import build_subscription
+from app.vpn.routing import build_happ_routing
 from app.vpn.sync import enabled_servers
 
 router = APIRouter()
@@ -28,6 +29,8 @@ async def subscription(token: str, s: AsyncSession = Depends(get_session)):
         "profile-update-interval": "12",
         "subscription-userinfo": f"upload=0; download=0; total=0; expire={expire}",
     }
+    if st.split_routing:
+        headers["routing"] = build_happ_routing(st.brand_name)
     if st.support_username:
         headers["support-url"] = f"https://t.me/{st.support_username}"
     return PlainTextResponse(body, headers=headers)
