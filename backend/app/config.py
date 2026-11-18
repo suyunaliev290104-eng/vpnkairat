@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     device_limit: int = 3
     support_username: str = ""
     brand_name: str = "VPN"
+    webapp_dist: str = ""  # built mini app dir; default: ../webapp/dist next to backend/
 
     cryptobot_token: str = ""
     cryptobot_testnet: bool = False

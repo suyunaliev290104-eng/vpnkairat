@@ -11,7 +11,7 @@ from app.config import get_settings
 from app.payments import registry
 
 log = logging.getLogger(__name__)
-WEBAPP_DIST = Path(__file__).resolve().parents[2] / "webapp" / "dist"
+DEFAULT_WEBAPP_DIST = Path(__file__).resolve().parents[2] / "webapp" / "dist"
 
 
 def create_app(background: bool = True) -> FastAPI:
@@ -36,8 +36,11 @@ def create_app(background: bool = True) -> FastAPI:
     async def health():
         return {"ok": True}
 
-    if WEBAPP_DIST.is_dir():
-        app.mount("/", StaticFiles(directory=WEBAPP_DIST, html=True), name="webapp")
+    dist = Path(get_settings().webapp_dist) if get_settings().webapp_dist else DEFAULT_WEBAPP_DIST
+    if dist.is_dir():
+        app.mount("/", StaticFiles(directory=dist, html=True), name="webapp")
+    else:
+        log.warning("mini app not found at %s — run `npm run build` in webapp/", dist)
     return app
 
 
