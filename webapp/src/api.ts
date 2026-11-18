@@ -11,7 +11,8 @@ export interface Me {
     traffic_used: number;
     device_limit: number;
   };
-  servers: { name: string; flag: string; country: string }[];
+  servers: { name: string; flag: string; country: string; kind: "direct" | "bypass" }[];
+  bypass: { available: boolean; used_today: number; limit: number };
   support_username: string;
 }
 

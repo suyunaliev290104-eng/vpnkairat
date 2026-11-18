@@ -119,3 +119,11 @@ h2, h3 { margin: 0; }
 .stats { display: flex; justify-content: center; text-align: center; }
 .stats > div { display: flex; flex-direction: column; }
 .big { font-size: 32px; font-weight: 800; }
+
+/* bypass */
+.bypass { display: flex; flex-direction: column; gap: 10px; }
+.bypass-head { display: flex; gap: 12px; align-items: flex-start; }
+.bypass-icon { font-size: 26px; line-height: 1; }
+.bar.dark { background: var(--bg); margin: 0; }
+.bar.dark > div { background: var(--green); }
+.bypass-meta { display: flex; justify-content: space-between; font-size: 13px; flex-wrap: wrap; gap: 4px; }

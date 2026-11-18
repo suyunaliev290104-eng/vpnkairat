@@ -23,6 +23,9 @@ export function Home({ me, setMe, go }: { me: Me; setMe: (m: Me) => void; go: (s
   }
 
   const progress = sub.active ? Math.min(100, (sub.days_left / 30) * 100) : 0;
+  const direct = me.servers.filter((s) => s.kind !== "bypass");
+  const bp = me.bypass;
+  const bpPct = Math.min(100, (bp.used_today / bp.limit) * 100);
 
   return (
     <div className="screen">
@@ -57,20 +60,41 @@ export function Home({ me, setMe, go }: { me: Me; setMe: (m: Me) => void; go: (s
         <>
           {sub.trial_available && <Button loading={busy} onClick={trial}>🎁 Попробовать 3 дня бесплатно</Button>}
           <Button variant={sub.trial_available ? "secondary" : "primary"} onClick={() => go("plans")}>
-            Выбрать тариф · от 99 ₽/мес
+            Выбрать тариф
           </Button>
         </>
       )}
 
-      {me.servers.length > 0 && (
+      {direct.length > 0 && (
         <>
           <h3 className="section">Локации</h3>
           <Card className="locations">
-            {me.servers.map((s) => (
+            {direct.map((s) => (
               <span key={s.name} className="chip">{s.flag} {s.name}</span>
             ))}
           </Card>
         </>
+      )}
+
+      {bp.available && (
+        <Card className="bypass">
+          <div className="bypass-head">
+            <span className="bypass-icon">🛡</span>
+            <div>
+              <div className="row-title">Обход белых списков</div>
+              <div className="row-sub">Включайте, когда мобильный интернет работает только по белым спискам</div>
+            </div>
+          </div>
+          {sub.active && (
+            <>
+              <div className="bar dark"><div style={{ width: `${bpPct}%` }} /></div>
+              <div className="bypass-meta">
+                <span>Сегодня: {fmtBytes(bp.used_today)} из {fmtBytes(bp.limit)}</span>
+                <span className="muted">обновится в 00:00 МСК</span>
+              </div>
+            </>
+          )}
+        </Card>
       )}
 
       <Card className="list">

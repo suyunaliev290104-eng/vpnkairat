@@ -14,7 +14,8 @@ export const months = (n: number) => `${n} ${plural(n, "месяц", "месяц
 export function fmtBytes(b: number) {
   if (b < 1024 ** 2) return `${(b / 1024).toFixed(0)} КБ`;
   if (b < 1024 ** 3) return `${(b / 1024 ** 2).toFixed(0)} МБ`;
-  return `${(b / 1024 ** 3).toFixed(1)} ГБ`;
+  const gb = b / 1024 ** 3;
+  return `${Number.isInteger(gb) ? gb : gb.toFixed(1)} ГБ`;
 }
 
 const CUR: Record<string, string> = { RUB: "₽", XTR: "⭐", USDT: "USDT" };

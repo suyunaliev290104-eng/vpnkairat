@@ -81,6 +81,12 @@ export function Connect({ me, go }: { me: Me; go: (s: "plans") => void }) {
         <div className="step-body">
           <div className="step-title">Включите VPN</div>
           <p className="muted small">Выберите любую локацию и нажмите кнопку подключения в приложении. Готово 🎉</p>
+          {me.bypass.available && (
+            <p className="muted small">
+              🛡 Если мобильный интернет работает только по белым спискам, выберите в приложении сервер
+              «Обход белых списков». Лимит — {Math.round(me.bypass.limit / 1024 ** 3)} ГБ в сутки.
+            </p>
+          )}
         </div>
       </Card>
     </div>
