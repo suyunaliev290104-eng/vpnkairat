@@ -89,7 +89,13 @@ SID="$(openssl rand -hex 4)"
 
 PANEL="https://127.0.0.1:${PANEL_PORT}/${PANEL_PATH}"
 JAR="$(mktemp)"
-curl -fsSk -c "$JAR" -X POST "$PANEL/login" -d "username=$PANEL_USER&password=$PANEL_PASS" | jq -e .success >/dev/null
+# 3x-ui 3.x: POST-запросы требуют CSRF-токен; после входа сессия меняется — берём токен заново.
+csrf() { curl -fsSk -b "$JAR" -c "$JAR" "$PANEL/csrf-token" | jq -r '.obj // empty'; }
+api() { curl -fsSk -b "$JAR" -c "$JAR" -H "X-CSRF-Token: $CSRF" -X POST "$@"; }
+CSRF="$(csrf)"
+api "$PANEL/login" -d "username=$PANEL_USER&password=$PANEL_PASS" | jq -e .success >/dev/null \
+  || { echo "Не удалось войти в панель"; exit 1; }
+CSRF="$(csrf)"
 
 SETTINGS='{"clients":[],"decryption":"none","fallbacks":[]}'
 STREAM=$(jq -nc --arg sni "$SNI" --arg priv "$PRIV" --arg pub "$PUB" --arg sid "$SID" '{
@@ -100,7 +106,7 @@ STREAM=$(jq -nc --arg sni "$SNI" --arg priv "$PRIV" --arg pub "$PUB" --arg sid "
 SNIFF='{"enabled":true,"destOverride":["http","tls","quic"]}'
 
 echo "==> Создаю inbound VLESS Reality на порту $PORT"
-RESP=$(curl -fsSk -b "$JAR" -X POST "$PANEL/panel/api/inbounds/add" \
+RESP=$(api "$PANEL/panel/api/inbounds/add" \
   --data-urlencode "remark=vless-reality" --data-urlencode "enable=true" --data-urlencode "port=$PORT" \
   --data-urlencode "protocol=vless" --data-urlencode "settings=$SETTINGS" \
   --data-urlencode "streamSettings=$STREAM" --data-urlencode "sniffing=$SNIFF" \
@@ -112,12 +118,11 @@ RELAY_LINK=""
 if [[ "$KIND" == direct ]]; then
   echo "==> Создаю relay-клиента для будущих серверов обхода белых списков"
   RUUID="$(cat /proc/sys/kernel/random/uuid)"
-  RCLIENT=$(jq -nc --arg id "$RUUID" --arg email "relay-$(openssl rand -hex 3)" \
-    '{clients:[{id:$id, email:$email, flow:"xtls-rprx-vision", limitIp:0, totalGB:0, expiryTime:0,
-                enable:true, subId:"", tgId:"", reset:0}]}')
-  curl -fsSk -b "$JAR" -X POST "$PANEL/panel/api/inbounds/addClient" \
-    -H "Content-Type: application/json" -d "$(jq -nc --argjson id "$INBOUND_ID" --arg s "$RCLIENT" '{id:$id, settings:$s}')" \
-    | jq -e .success >/dev/null
+  RBODY=$(jq -nc --arg id "$RUUID" --arg email "relay-$(openssl rand -hex 3)" --argjson ib "$INBOUND_ID" \
+    '{client:{id:$id, email:$email, flow:"xtls-rprx-vision", limitIp:0, totalGB:0, expiryTime:0,
+              enable:true, subId:"", tgId:0}, inboundIds:[$ib]}')
+  api "$PANEL/panel/api/clients/add" -H "Content-Type: application/json" -d "$RBODY" | jq -e .success >/dev/null \
+    || { echo "Не удалось создать relay-клиента"; exit 1; }
   RELAY_LINK="vless://${RUUID}@${HOST}:${PORT}?type=tcp&security=reality&pbk=${PUB}&fp=chrome&sni=${SNI}&sid=${SID}&flow=xtls-rprx-vision#relay"
 else
   echo "==> Направляю весь трафик на зарубежный выход"
@@ -131,11 +136,11 @@ else
       settings:{vnext:[{address:$addr, port:$port, users:[{id:$id, encryption:"none", flow:$flow}]}]},
       streamSettings:{network:"tcp", security:"reality",
         realitySettings:{serverName:$sni, fingerprint:"chrome", publicKey:$pbk, shortId:$sid, spiderX:"/"}}}')
-  CUR=$(curl -fsSk -b "$JAR" -X POST "$PANEL/panel/xray/" | jq -r .obj | jq -c .xraySetting)
+  CUR=$(api "$PANEL/panel/api/xray/" | jq -r '.obj.xraySetting' | jq -c .)
   # Первый outbound — маршрут по умолчанию: ставим «exit» первым, остальные (direct, blocked) оставляем.
   NEW=$(echo "$CUR" | jq -c --argjson out "$OUT" '.outbounds = [$out] + ((.outbounds // []) | map(select(.tag != "exit")))')
-  curl -fsSk -b "$JAR" -X POST "$PANEL/panel/xray/update" --data-urlencode "xraySetting=$NEW" | jq -e .success >/dev/null
-  curl -fsSk -b "$JAR" -X POST "$PANEL/panel/api/server/restartXrayService" >/dev/null || x-ui restart >/dev/null
+  api "$PANEL/panel/api/xray/update" --data-urlencode "xraySetting=$NEW" | jq -e .success >/dev/null
+  api "$PANEL/panel/api/server/restartXrayService" >/dev/null || systemctl restart x-ui
 fi
 rm -f "$JAR"
 
