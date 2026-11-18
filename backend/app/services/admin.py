@@ -40,5 +40,14 @@ async def find_user(s: AsyncSession, query: str) -> User | None:
     return await s.scalar(select(User).where(func.lower(User.username) == name))
 
 
+async def queue_resync_all(s: AsyncSession) -> int:
+    """Mark every active subscription for re-sync (e.g. after adding a server). Returns count."""
+    subs = list(await s.scalars(select(Subscription).where(Subscription.expires_at > utcnow())))
+    for sub in subs:
+        sub.needs_sync = True
+    await s.commit()
+    return len(subs)
+
+
 async def all_user_ids(s: AsyncSession) -> list[int]:
     return list(await s.scalars(select(User.tg_id)))

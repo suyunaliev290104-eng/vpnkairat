@@ -13,7 +13,7 @@ from app.config import get_settings
 from app.context import ctx
 from app.db import get_sessionmaker
 from app.models import Server, utcnow
-from app.services.admin import all_user_ids, find_user, stats
+from app.services.admin import all_user_ids, find_user, queue_resync_all, stats
 from app.services.subscription import extend, get_or_create_subscription
 from app.vpn.sync import sync_user
 
@@ -42,8 +42,10 @@ def parse_server_json(raw: str) -> Server:
     missing = [k for k in SERVER_REQUIRED if k not in data]
     if missing:
         raise ValueError("не хватает полей: " + ", ".join(missing))
+    if data.get("kind", "direct") not in ("direct", "bypass"):
+        raise ValueError('kind должен быть "direct" или "bypass"')
     allowed = {c.name for c in Server.__table__.columns} - {"id"}
-    return Server(**{"port": 443, "enabled": True, "reality_sid": "", "flag": "🌐", "country": "",
+    return Server(**{"port": 443, "enabled": True, "reality_sid": "", "flag": "🌐", "country": "", "kind": "direct",
                      **{k: v for k, v in data.items() if k in allowed}})
 
 
@@ -174,7 +176,7 @@ async def bc_go(c: CallbackQuery, state: FSMContext) -> None:
 
 
 def servers_kb(servers: list[Server]) -> InlineKeyboardMarkup:
-    rows = [[InlineKeyboardButton(text=f"{'🟢' if s.enabled else '⚪️'} {s.flag} {s.name}",
+    rows = [[InlineKeyboardButton(text=f"{'🟢' if s.enabled else '⚪️'} {'🛡 ' if s.kind == 'bypass' else ''}{s.flag} {s.name}",
                                   callback_data=f"adm:srv_t:{s.id}")] for s in servers]
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -216,16 +218,14 @@ async def add_server(m: Message, command) -> None:
     async with get_sessionmaker()() as s:
         s.add(srv)
         await s.commit()
-    await m.answer(f"✅ Сервер {srv.flag} {srv.name} добавлен. Существующие клиенты будут добавлены на него "
-                   "при следующей синхронизации (/resync).")
+        n = await queue_resync_all(s)
+    kind = "🛡 обхода белых списков" if srv.kind == "bypass" else ""
+    await m.answer(f"✅ Сервер {kind} {srv.flag} {srv.name} добавлен. {n} активных клиентов появятся на нём "
+                   "в течение 10 минут.")
 
 
 @router.message(Command("resync"))
 async def resync_all(m: Message) -> None:
-    from app.models import Subscription
     async with get_sessionmaker()() as s:
-        subs = list(await s.scalars(select(Subscription).where(Subscription.expires_at > utcnow())))
-        for sub in subs:
-            sub.needs_sync = True
-        await s.commit()
-    await m.answer(f"🔄 {len(subs)} активных подписок поставлено в очередь синхронизации (до 10 минут).")
+        n = await queue_resync_all(s)
+    await m.answer(f"🔄 {n} активных подписок поставлено в очередь синхронизации (до 10 минут).")

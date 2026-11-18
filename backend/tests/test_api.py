@@ -24,7 +24,7 @@ class FakeVpn:
         self.specs.append(spec)
 
     async def get_traffic(self, server, email):
-        return (100, 200)
+        return (100, 200) if server.kind != "bypass" else (1000, 2000)
 
 
 class FakeBot:
@@ -62,12 +62,12 @@ def auth(user_id=42):
     return {"Authorization": "tma " + sign(make(user_id=user_id), TOKEN)}
 
 
-async def add_server():
+async def add_server(kind="direct", name="Нидерланды"):
     from app.models import Server
     async with get_sessionmaker()() as s:
-        s.add(Server(name="Нидерланды", flag="🇳🇱", country="NL", panel_url="https://p", username="a",
+        s.add(Server(name=name, flag="🇳🇱", country="NL", panel_url="https://p", username="a",
                      password="b", inbound_id=1, host="nl.example", port=443, reality_pbk="K",
-                     reality_sni="sni.com", reality_sid=""))
+                     reality_sni="sni.com", reality_sid="", kind=kind))
         await s.commit()
 
 
@@ -84,7 +84,8 @@ async def test_me_new_user(client):
     assert d["user"]["tg_id"] == 42
     assert d["subscription"]["active"] is False and d["subscription"]["trial_available"] is True
     assert d["subscription"]["sub_url"].startswith("https://vpn.example/sub/")
-    assert d["servers"] == [{"name": "Нидерланды", "flag": "🇳🇱", "country": "NL"}]
+    assert d["servers"] == [{"name": "Нидерланды", "flag": "🇳🇱", "country": "NL", "kind": "direct"}]
+    assert d["bypass"] == {"available": False, "used_today": 0, "limit": 5 * 1024 ** 3}
     assert d["support_username"] == ""
 
 
@@ -208,3 +209,13 @@ async def test_connect_redirect_page(client):
     assert r.status_code == 200 and "happ://add/https://vpn.example/sub/" in r.text
     assert (await client.get(f"/connect/{token}/evil")).status_code == 404
     assert (await client.get("/connect/nope/happ")).status_code == 404
+
+
+async def test_me_bypass_usage(client):
+    await add_server()
+    await add_server(kind="bypass", name="Москва")
+    await client.post("/api/trial", headers=auth())
+    d = (await client.get("/api/me", headers=auth())).json()
+    assert d["bypass"] == {"available": True, "used_today": 3000, "limit": 5 * 1024 ** 3}
+    assert d["subscription"]["traffic_used"] == 3300
+    assert [s["kind"] for s in d["servers"]] == ["direct", "bypass"]

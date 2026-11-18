@@ -8,7 +8,8 @@ from app.bot import notify
 from app.models import Subscription, User, utcnow
 from app.payments.service import Notifier, _safe_notify
 from app.vpn.base import VpnProvider
-from app.vpn.sync import sync_user
+from app.vpn.base import BYPASS
+from app.vpn.sync import enabled_servers, sync_user
 
 log = logging.getLogger(__name__)
 
@@ -54,6 +55,25 @@ async def resync(s: AsyncSession, vpn: VpnProvider) -> None:
     subs = await s.scalars(select(Subscription).where(Subscription.needs_sync.is_(True)))
     for sub in list(subs):
         await sync_user(s, await s.get(User, sub.user_id), vpn)
+
+
+async def reset_bypass(s: AsyncSession, vpn: VpnProvider) -> None:
+    """Daily (00:00 MSK): reset per-client traffic on bypass servers → new 5 GB/day allowance."""
+    for server in await enabled_servers(s):
+        if server.kind != BYPASS:
+            continue
+        try:
+            await vpn.reset_traffic(server)
+        except Exception:
+            log.exception("bypass traffic reset failed on %s", server.name)
+
+
+async def run_reset_bypass() -> None:
+    from app.context import ctx
+    from app.db import get_sessionmaker
+
+    async with get_sessionmaker()() as s:
+        await reset_bypass(s, ctx.vpn)
 
 
 async def run_all() -> None:

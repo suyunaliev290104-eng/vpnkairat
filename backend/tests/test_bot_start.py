@@ -20,3 +20,13 @@ def test_parse_server_json_missing_field():
     import pytest
     with pytest.raises(ValueError):
         parse_server_json('{"name":"DE"}')
+
+
+def test_parse_server_json_kind():
+    import pytest
+    base = ('{"name":"RU","panel_url":"https://p","username":"a","password":"b","inbound_id":1,'
+            '"host":"ru.ex","reality_pbk":"K","reality_sni":"ya.ru"')
+    assert parse_server_json(base + "}").kind == "direct"
+    assert parse_server_json(base + ',"kind":"bypass"}').kind == "bypass"
+    with pytest.raises(ValueError):
+        parse_server_json(base + ',"kind":"weird"}')

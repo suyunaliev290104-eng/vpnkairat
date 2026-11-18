@@ -85,3 +85,25 @@ async def test_resync_clears_flag(session, user_factory, server_factory):
     vpn = FakeVpn()
     await resync(session, vpn)
     assert sub.needs_sync is False and len(vpn.specs) == 1
+
+
+async def test_reset_bypass_only_enabled_bypass_servers(session, server_factory):
+    from app.scheduler import reset_bypass
+    await server_factory(host="nl")
+    await server_factory(host="ru1", kind="bypass")
+    await server_factory(host="ru2", kind="bypass")
+    await server_factory(host="off", kind="bypass", enabled=False)
+
+    class V(FakeVpn):
+        def __init__(self):
+            super().__init__()
+            self.reset = []
+
+        async def reset_traffic(self, server):
+            if server.host == "ru1":
+                raise RuntimeError("down")
+            self.reset.append(server.host)
+
+    v = V()
+    await reset_bypass(session, v)
+    assert v.reset == ["ru2"]

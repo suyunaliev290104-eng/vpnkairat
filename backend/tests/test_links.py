@@ -22,3 +22,10 @@ def test_build_subscription_base64_all_servers():
     decoded = base64.b64decode(build_subscription([S1, s2], "uuid-1")).decode()
     lines = decoded.split("\n")
     assert len(lines) == 2 and "de.example:8443" in lines[1]
+
+
+def test_bypass_label():
+    from urllib.parse import unquote
+    s = Server(name="Москва", flag="🇷🇺", host="ru.example", port=443, reality_pbk="K",
+               reality_sni="ya.ru", reality_sid="", kind="bypass")
+    assert unquote(build_vless(s, "u").split("#", 1)[1]) == "🛡 Обход белых списков · Москва"

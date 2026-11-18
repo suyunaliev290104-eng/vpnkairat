@@ -14,20 +14,22 @@ from app.payments import registry
 from app.payments.service import create_payment
 from app.plans import PLANS, discount_percent, per_month_rub
 from app.services.subscription import get_or_create_subscription, start_trial
+from app.vpn.base import BYPASS
 from app.vpn.sync import client_email, enabled_servers, sync_user
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
 
 
-async def _traffic(servers: list[Server], email: str) -> int:
+async def _traffic(servers: list[Server], email: str) -> list[int]:
+    """Bytes per server (0 if a panel doesn't answer within 3 s)."""
     async def one(srv):
         try:
             up, down = await asyncio.wait_for(ctx.vpn.get_traffic(srv, email), 3)
             return up + down
         except Exception:
             return 0
-    return sum(await asyncio.gather(*(one(s) for s in servers)))
+    return list(await asyncio.gather(*(one(s) for s in servers)))
 
 
 def sub_url(sub: Subscription) -> str:
@@ -41,7 +43,9 @@ async def me_payload(s: AsyncSession, user: User, with_traffic: bool = True) -> 
     days_left = 0
     if active:
         days_left = max(0, -(-int((sub.expires - utcnow()).total_seconds()) // 86400))  # ceil
-    traffic = await _traffic(servers, client_email(user)) if (with_traffic and sub.expires) else 0
+    per_server = await _traffic(servers, client_email(user)) if (with_traffic and sub.expires) else [0] * len(servers)
+    # bypass counters are reset daily, so their value is "used today"
+    bypass_today = sum(t for srv, t in zip(servers, per_server) if srv.kind == BYPASS)
     return {
         "user": {"tg_id": user.tg_id, "username": user.username, "email": user.email},
         "subscription": {
@@ -50,10 +54,15 @@ async def me_payload(s: AsyncSession, user: User, with_traffic: bool = True) -> 
             "days_left": days_left,
             "trial_available": not sub.trial_used and sub.expires is None,
             "sub_url": sub_url(sub),
-            "traffic_used": traffic,
+            "traffic_used": sum(per_server),
             "device_limit": get_settings().device_limit,
         },
-        "servers": [{"name": x.name, "flag": x.flag, "country": x.country} for x in servers],
+        "servers": [{"name": x.name, "flag": x.flag, "country": x.country, "kind": x.kind} for x in servers],
+        "bypass": {
+            "available": any(x.kind == BYPASS for x in servers),
+            "used_today": bypass_today,
+            "limit": get_settings().bypass_daily_gb * 1024 ** 3,
+        },
         "support_username": get_settings().support_username,
     }
 

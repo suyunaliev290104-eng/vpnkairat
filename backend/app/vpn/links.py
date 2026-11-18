@@ -14,7 +14,8 @@ def build_vless(server: Server, uuid: str) -> str:
         "sid": server.reality_sid or "",
         "flow": "xtls-rprx-vision",
     })
-    label = quote(f"{server.flag} {server.name}")
+    title = f"🛡 Обход белых списков · {server.name}" if server.kind == "bypass" else f"{server.flag} {server.name}"
+    label = quote(title)
     return f"vless://{uuid}@{server.host}:{server.port}?{q}#{label}"
 
 
