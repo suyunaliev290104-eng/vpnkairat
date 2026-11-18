@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     referral_bonus_days: int = 7
     device_limit: int = 3
     support_username: str = ""
+    brand_name: str = "VPN"
 
     cryptobot_token: str = ""
     cryptobot_testnet: bool = False
