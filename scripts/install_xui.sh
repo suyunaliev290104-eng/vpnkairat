@@ -2,13 +2,20 @@
 # Устанавливает 3x-ui + inbound VLESS/Reality на чистый Ubuntu/Debian VPS
 # и печатает команду /addserver для бота.
 #
-#   curl -fsSL <raw-url>/install_xui.sh | sudo bash -s -- --name "Нидерланды" --flag 🇳🇱
+# Два режима:
+#  • Обычная локация (зарубежный VPS) — также создаёт relay-клиента и печатает его ссылку:
+#      bash install_xui.sh --bot-ip 1.2.3.4 --name "Нидерланды" --flag 🇳🇱
+#  • Обход белых списков (VPS в РФ на IP из белого списка) — весь трафик уходит на зарубежный выход:
+#      bash install_xui.sh --bot-ip 1.2.3.4 --name "Москва" --flag 🇷🇺 --exit-link "vless://...relay..."
 #
 # Опции: --bot-ip IP (обязательно: IP сервера с ботом — только ему открывается панель)
-#        --name NAME  --flag EMOJI  --sni DOMAIN (по умолчанию www.microsoft.com)  --port 443
+#        --name NAME  --flag EMOJI  --port 443
+#        --sni DOMAIN  сайт для маскировки (по умолчанию www.microsoft.com; в режиме обхода — ya.ru,
+#                      берите сайт, который точно есть в белом списке вашего оператора)
+#        --exit-link LINK  relay-ссылка зарубежного выхода → режим обхода белых списков
 set -euo pipefail
 
-NAME="Server"; FLAG="🌐"; SNI="www.microsoft.com"; PORT=443; BOT_IP=""
+NAME="Server"; FLAG="🌐"; SNI=""; PORT=443; BOT_IP=""; EXIT_LINK=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --name) NAME="$2"; shift 2;;
@@ -16,11 +23,18 @@ while [[ $# -gt 0 ]]; do
     --sni)  SNI="$2"; shift 2;;
     --port) PORT="$2"; shift 2;;
     --bot-ip) BOT_IP="$2"; shift 2;;
+    --exit-link) EXIT_LINK="$2"; shift 2;;
     *) echo "unknown option $1"; exit 1;;
   esac
 done
 [[ $EUID -eq 0 ]] || { echo "Запустите от root (sudo)"; exit 1; }
 [[ -n "$BOT_IP" ]] || { echo "Укажите --bot-ip <IP сервера с ботом>"; exit 1; }
+if [[ -n "$EXIT_LINK" ]]; then
+  KIND=bypass; SNI="${SNI:-ya.ru}"
+  [[ "$EXIT_LINK" == vless://* ]] || { echo "--exit-link должен начинаться с vless://"; exit 1; }
+else
+  KIND=direct; SNI="${SNI:-www.microsoft.com}"
+fi
 
 apt-get update -qq && apt-get install -y -qq curl jq openssl ufw >/dev/null
 
@@ -83,13 +97,43 @@ RESP=$(curl -fsSk -b "$JAR" -X POST "$PANEL/panel/api/inbounds/add" \
   --data-urlencode "expiryTime=0" --data-urlencode "total=0" --data-urlencode "up=0" --data-urlencode "down=0")
 echo "$RESP" | jq -e .success >/dev/null || { echo "Ошибка создания inbound: $RESP"; exit 1; }
 INBOUND_ID=$(echo "$RESP" | jq .obj.id)
+
+RELAY_LINK=""
+if [[ "$KIND" == direct ]]; then
+  echo "==> Создаю relay-клиента для будущих серверов обхода белых списков"
+  RUUID="$(cat /proc/sys/kernel/random/uuid)"
+  RCLIENT=$(jq -nc --arg id "$RUUID" --arg email "relay-$(openssl rand -hex 3)" \
+    '{clients:[{id:$id, email:$email, flow:"xtls-rprx-vision", limitIp:0, totalGB:0, expiryTime:0,
+                enable:true, subId:"", tgId:"", reset:0}]}')
+  curl -fsSk -b "$JAR" -X POST "$PANEL/panel/api/inbounds/addClient" \
+    -H "Content-Type: application/json" -d "$(jq -nc --argjson id "$INBOUND_ID" --arg s "$RCLIENT" '{id:$id, settings:$s}')" \
+    | jq -e .success >/dev/null
+  RELAY_LINK="vless://${RUUID}@${HOST}:${PORT}?type=tcp&security=reality&pbk=${PUB}&fp=chrome&sni=${SNI}&sid=${SID}&flow=xtls-rprx-vision#relay"
+else
+  echo "==> Направляю весь трафик на зарубежный выход"
+  rest="${EXIT_LINK#vless://}"; rest="${rest%%#*}"
+  E_UUID="${rest%%@*}"; hp="${rest#*@}"; hp="${hp%%\?*}"; E_HOST="${hp%:*}"; E_PORT="${hp##*:}"
+  Q="${rest#*\?}"
+  qp() { echo "$Q" | tr '&' '\n' | grep "^$1=" | head -1 | cut -d= -f2-; }
+  OUT=$(jq -nc --arg addr "$E_HOST" --argjson port "$E_PORT" --arg id "$E_UUID" --arg flow "$(qp flow)" \
+    --arg sni "$(qp sni)" --arg pbk "$(qp pbk)" --arg sid "$(qp sid)" '{
+      tag:"exit", protocol:"vless",
+      settings:{vnext:[{address:$addr, port:$port, users:[{id:$id, encryption:"none", flow:$flow}]}]},
+      streamSettings:{network:"tcp", security:"reality",
+        realitySettings:{serverName:$sni, fingerprint:"chrome", publicKey:$pbk, shortId:$sid, spiderX:"/"}}}')
+  CUR=$(curl -fsSk -b "$JAR" -X POST "$PANEL/panel/xray/" | jq -r .obj | jq -c .xraySetting)
+  # Первый outbound — маршрут по умолчанию: ставим «exit» первым, остальные (direct, blocked) оставляем.
+  NEW=$(echo "$CUR" | jq -c --argjson out "$OUT" '.outbounds = [$out] + ((.outbounds // []) | map(select(.tag != "exit")))')
+  curl -fsSk -b "$JAR" -X POST "$PANEL/panel/xray/update" --data-urlencode "xraySetting=$NEW" | jq -e .success >/dev/null
+  curl -fsSk -b "$JAR" -X POST "$PANEL/panel/api/server/restartXrayService" >/dev/null || x-ui restart >/dev/null
+fi
 rm -f "$JAR"
 
 JSON=$(jq -nc --arg name "$NAME" --arg flag "$FLAG" --arg url "https://${HOST}:${PANEL_PORT}/${PANEL_PATH}" \
   --arg u "$PANEL_USER" --arg p "$PANEL_PASS" --argjson id "$INBOUND_ID" --arg host "$HOST" --argjson port "$PORT" \
-  --arg pbk "$PUB" --arg sni "$SNI" --arg sid "$SID" --rawfile cert "$CERT_DIR/cert.pem" \
+  --arg pbk "$PUB" --arg sni "$SNI" --arg sid "$SID" --rawfile cert "$CERT_DIR/cert.pem" --arg kind "$KIND" \
   '{name:$name, flag:$flag, panel_url:$url, username:$u, password:$p, inbound_id:$id, host:$host, port:$port,
-    reality_pbk:$pbk, reality_sni:$sni, reality_sid:$sid, panel_cert:$cert}')
+    reality_pbk:$pbk, reality_sni:$sni, reality_sid:$sid, panel_cert:$cert, kind:$kind}')
 
 cat <<MSG
 
@@ -106,3 +150,12 @@ cat <<MSG
 /addserver ${JSON}
 
 MSG
+
+if [[ -n "$RELAY_LINK" ]]; then
+  cat <<MSG
+Relay-ссылка этого сервера (для серверов обхода белых списков, храните в секрете):
+
+$RELAY_LINK
+
+MSG
+fi
