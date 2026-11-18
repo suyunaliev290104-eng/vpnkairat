@@ -47,15 +47,25 @@ HOST="$(curl -fsS https://api.ipify.org)"
 echo "==> Устанавливаю 3x-ui"
 # Официальный установщик; на вопросы отвечаем «нет» — настройки зададим сами ниже.
 yes n | bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh) || true
-x-ui setting -username "$PANEL_USER" -password "$PANEL_PASS" -port "$PANEL_PORT" -webBasePath "$PANEL_PATH" >/dev/null
+# Настройки передаём самому бинарнику: у обёртки `x-ui` в новых версиях нет подкоманды `setting`.
+XUI_BIN=/usr/local/x-ui/x-ui
+[[ -x "$XUI_BIN" ]] || { echo "3x-ui не установился: нет $XUI_BIN"; exit 1; }
+"$XUI_BIN" setting -username "$PANEL_USER" -password "$PANEL_PASS" -port "$PANEL_PORT" -webBasePath "$PANEL_PATH" >/dev/null
 
 echo "==> HTTPS для панели (самоподписанный сертификат, бот его закрепляет)"
 CERT_DIR=/etc/x-ui-cert; mkdir -p "$CERT_DIR"
 openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=${HOST}" \
   -addext "subjectAltName=IP:${HOST}" -keyout "$CERT_DIR/key.pem" -out "$CERT_DIR/cert.pem" 2>/dev/null
-x-ui cert -webCert "$CERT_DIR/cert.pem" -webCertKey "$CERT_DIR/key.pem" >/dev/null 2>&1 \
-  || x-ui setting -webCert "$CERT_DIR/cert.pem" -webCertKey "$CERT_DIR/key.pem" >/dev/null
-x-ui restart >/dev/null; sleep 3
+"$XUI_BIN" cert -webCert "$CERT_DIR/cert.pem" -webCertKey "$CERT_DIR/key.pem" >/dev/null 2>&1 \
+  || "$XUI_BIN" setting -webCert "$CERT_DIR/cert.pem" -webCertKey "$CERT_DIR/key.pem" >/dev/null
+systemctl restart x-ui
+
+echo "==> Жду запуска панели на порту $PANEL_PORT"
+for i in $(seq 1 30); do
+  curl -sk -o /dev/null "https://127.0.0.1:${PANEL_PORT}/${PANEL_PATH}/" && break
+  [[ $i -eq 30 ]] && { echo "Панель не запустилась на порту $PANEL_PORT. Вывод: x-ui settings"; "$XUI_BIN" setting -show; exit 1; }
+  sleep 2
+done
 
 echo "==> Фаервол: SSH и VPN открыты всем, панель — только боту ($BOT_IP)"
 ufw allow 22/tcp >/dev/null
