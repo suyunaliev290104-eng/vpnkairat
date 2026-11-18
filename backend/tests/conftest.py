@@ -33,3 +33,21 @@ def user_factory(session):
         await session.commit()
         return u
     return make
+
+
+@pytest.fixture
+def server_factory(session):
+    from app.models import Server
+
+    async def make(**kw) -> Server:
+        defaults = dict(
+            name="Нидерланды", country="NL", flag="🇳🇱", panel_url="https://nl.example:2053/path",
+            username="admin", password="pw", inbound_id=1, host="nl.example", port=443,
+            reality_pbk="PBK", reality_sni="www.microsoft.com", reality_sid="ab12", enabled=True,
+        )
+        defaults.update(kw)
+        srv = Server(**defaults)
+        session.add(srv)
+        await session.commit()
+        return srv
+    return make
