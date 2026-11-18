@@ -26,7 +26,7 @@ BASE_MONTH_RUB = PLANS["m1"].rub
 
 
 def per_month_rub(plan: Plan) -> int:
-    return round(plan.rub / plan.months)
+    return int(plan.rub / plan.months + 0.5)  # half-up, not banker's rounding
 
 
 def discount_percent(plan: Plan) -> int:

@@ -8,7 +8,7 @@ def test_prices():
 
 def test_discounts():
     assert [discount_percent(PLANS[k]) for k in ("m1", "m3", "m6", "m12")] == [0, 16, 27, 38]
-    assert per_month_rub(PLANS["m12"]) == 99
+    assert [per_month_rub(PLANS[k]) for k in ("m1", "m3", "m6", "m12")] == [159, 133, 117, 99]
 
 
 def test_badges_and_days():

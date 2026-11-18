@@ -198,3 +198,13 @@ async def test_referrals(client):
     d = (await client.get("/api/referrals", headers=auth())).json()
     assert d["link"] == "https://t.me/my_vpn_bot?start=ref_42"
     assert d["invited"] == 0 and d["bonus_days"] == 7
+
+
+async def test_connect_redirect_page(client):
+    await client.post("/api/trial", headers=auth())
+    url = (await client.get("/api/me", headers=auth())).json()["subscription"]["sub_url"]
+    token = url.rsplit("/", 1)[1]
+    r = await client.get(f"/connect/{token}/happ")
+    assert r.status_code == 200 and "happ://add/https://vpn.example/sub/" in r.text
+    assert (await client.get(f"/connect/{token}/evil")).status_code == 404
+    assert (await client.get("/connect/nope/happ")).status_code == 404
