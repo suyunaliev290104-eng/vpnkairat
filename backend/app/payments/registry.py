@@ -27,4 +27,4 @@ def available(settings: Settings | None = None) -> list[PaymentProvider]:
 
 def load_builtin() -> None:
     """Import built-in providers so their @register decorators run."""
-    from app.payments import cryptobot, stars  # noqa: F401
+    from app.payments import cryptobot, lavatop, stars  # noqa: F401

@@ -33,6 +33,7 @@ class PaymentProvider(ABC):
     title: str  # shown to users
     currency: str
     kind: str = "link"  # "link" → openLink, "invoice" → Telegram openInvoice
+    needs_email: bool = False  # ask the buyer for e-mail before paying (receipts)
 
     @abstractmethod
     def price(self, plan: Plan) -> int | Decimal: ...
