@@ -40,7 +40,7 @@ async def test_create_invoice_uses_offer_and_email(session, user_factory):
     assert req.headers["X-Api-Key"] == "KEY"
     body = json.loads(req.content)
     assert body == {"email": "a@b.ru", "offerId": "off-3", "currency": "RUB", "buyerLanguage": "RU"}
-    assert p.provider_payment_id == "contract-1" and p.amount == 399 and p.currency == "RUB"
+    assert p.provider_payment_id == "contract-1" and p.amount == 549 and p.currency == "RUB"
     assert inv.payment_url == "https://pay.lava.top/x"
 
 

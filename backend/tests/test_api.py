@@ -92,9 +92,9 @@ async def test_plans(client):
     d = (await client.get("/api/plans", headers=auth())).json()
     assert [p["id"] for p in d["plans"]] == ["m1", "m3", "m6", "m12"]
     m12 = d["plans"][3]
-    assert m12["badge"] == "Выгоднее всего" and m12["discount"] == 38 and m12["per_month_rub"] == 99
-    assert m12["prices"]["lavatop"] == {"amount": 1190, "currency": "RUB"}
-    assert m12["prices"]["stars"] == {"amount": 1080, "currency": "XTR"}
+    assert m12["badge"] == "Выгоднее всего" and m12["discount"] == 25 and m12["per_month_rub"] == 149
+    assert m12["prices"]["lavatop"] == {"amount": 1790, "currency": "RUB"}
+    assert m12["prices"]["stars"] == {"amount": 1700, "currency": "XTR"}
     names = [p["name"] for p in d["providers"]]
     assert "stars" in names and "lavatop" in names and "cryptobot" not in names
     lava = next(p for p in d["providers"] if p["name"] == "lavatop")

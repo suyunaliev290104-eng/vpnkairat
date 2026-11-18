@@ -28,9 +28,9 @@ async def test_stars_invoice(session, user_factory, monkeypatch):
     u = await user_factory()
     p, inv = await create_payment(session, u, "m12", "stars")
     assert inv.payment_url == "https://t.me/$invoice"
-    assert p.provider_payment_id is None and p.amount == 1080 and p.currency == "XTR"
+    assert p.provider_payment_id is None and p.amount == 1700 and p.currency == "XTR"
     assert bot.kw["currency"] == "XTR" and bot.kw["payload"] == f"pay:{p.id}"
-    assert bot.kw["prices"][0].amount == 1080
+    assert bot.kw["prices"][0].amount == 1700
     assert registry.get("stars").kind == "invoice"
 
 
@@ -39,10 +39,10 @@ async def test_pre_checkout_only_pending(session, user_factory, monkeypatch):
     monkeypatch.setattr(ctx, "bot", FakeBot())
     u = await user_factory()
     p, _ = await create_payment(session, u, "m1", "stars")
-    assert await check_pre_checkout(session, f"pay:{p.id}", 150) is True
+    assert await check_pre_checkout(session, f"pay:{p.id}", 190) is True
     assert await check_pre_checkout(session, f"pay:{p.id}", 1) is False
-    assert await check_pre_checkout(session, "pay:999999", 150) is False
-    assert await check_pre_checkout(session, "garbage", 150) is False
+    assert await check_pre_checkout(session, "pay:999999", 190) is False
+    assert await check_pre_checkout(session, "garbage", 190) is False
 
 
 async def test_successful_payment_marks_paid(session, user_factory, monkeypatch):

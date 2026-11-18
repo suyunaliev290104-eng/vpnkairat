@@ -63,7 +63,7 @@ def close(a, b):
 async def test_create_payment_stores_pending(session, user_factory):
     u = await user_factory()
     p, inv = await create_payment(session, u, "m3", "dummy")
-    assert p.status == "pending" and p.amount == 399 and p.currency == "RUB" and p.plan_id == "m3"
+    assert p.status == "pending" and p.amount == 549 and p.currency == "RUB" and p.plan_id == "m3"
     assert p.provider_payment_id == f"inv-{p.id}" and inv.payment_url == "https://pay/x"
 
 

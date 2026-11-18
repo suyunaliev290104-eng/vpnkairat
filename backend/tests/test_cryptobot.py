@@ -45,7 +45,7 @@ async def test_create_invoice(session, user_factory):
     req = route.calls.last.request
     assert req.headers["Crypto-Pay-API-Token"] == TOKEN
     body = json.loads(req.content)
-    assert body["asset"] == "USDT" and body["amount"] == "9" and body["payload"] == str(p.id)
+    assert body["asset"] == "USDT" and body["amount"] == "13" and body["payload"] == str(p.id)
     assert p.provider_payment_id == "777" and p.currency == "USDT"
     assert inv.payment_url == "https://t.me/CryptoBot/app?startapp=x"
 
