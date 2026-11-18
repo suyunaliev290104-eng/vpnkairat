@@ -46,7 +46,7 @@ class XuiProvider:
             "expiryTime": spec.expiry_ms,
             "enable": spec.enabled,
             "subId": spec.sub_id,
-            "totalGB": 0,
+            "totalGB": spec.total_bytes,  # 3x-ui stores bytes despite the name
             "tgId": "",
             "reset": 0,
         }
@@ -64,6 +64,12 @@ class XuiProvider:
                 if r.json().get("success"):
                     return
             raise XuiError(f"{server.name}: {r.json().get('msg')}")
+
+    async def reset_traffic(self, server: Server) -> None:
+        async with self._client(server) as c:
+            r = await c.post(f"/panel/api/inbounds/resetAllClientTraffics/{server.inbound_id}")
+            if not r.json().get("success"):
+                raise XuiError(f"{server.name}: reset failed: {r.json().get('msg')}")
 
     async def get_traffic(self, server: Server, email: str) -> tuple[int, int]:
         async with self._client(server) as c:

@@ -11,7 +11,8 @@ from app.vpn.xui import XuiProvider
 SRV = Server(name="NL", panel_url="https://p.example/base", username="a", password="b",
              inbound_id=7, host="h", port=443, reality_pbk="k", reality_sni="s", reality_sid="")
 SPEC = ClientSpec(uuid="11111111-1111-1111-1111-111111111111", email="tg42",
-                  expiry_ms=1_700_000_000_000, enabled=True, limit_ip=3, sub_id="tok")
+                  expiry_ms=1_700_000_000_000, enabled=True, limit_ip=3, sub_id="tok",
+                  total_bytes=5 * 1024 ** 3)
 
 
 @respx.mock
@@ -26,7 +27,7 @@ async def test_add_client_payload():
     assert client["id"] == SPEC.uuid and client["email"] == "tg42"
     assert client["flow"] == "xtls-rprx-vision" and client["limitIp"] == 3
     assert client["expiryTime"] == 1_700_000_000_000 and client["enable"] is True
-    assert client["subId"] == "tok" and client["totalGB"] == 0
+    assert client["subId"] == "tok" and client["totalGB"] == 5 * 1024 ** 3
 
 
 @respx.mock
@@ -69,3 +70,12 @@ def test_pinned_cert_builds_ssl_context():
     ctx = XuiProvider._verify(srv)
     assert isinstance(ctx, ssl.SSLContext) and ctx.verify_mode == ssl.CERT_REQUIRED and ctx.check_hostname is False
     assert XuiProvider._verify(SRV) is True
+
+
+@respx.mock
+async def test_reset_traffic_calls_reset_all():
+    respx.post("https://p.example/base/login").mock(return_value=httpx.Response(200, json={"success": True}))
+    reset = respx.post("https://p.example/base/panel/api/inbounds/resetAllClientTraffics/7").mock(
+        return_value=httpx.Response(200, json={"success": True}))
+    await XuiProvider().reset_traffic(SRV)
+    assert reset.called

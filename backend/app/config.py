@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     trial_days: int = 3
     referral_bonus_days: int = 7
     device_limit: int = 3
+    bypass_daily_gb: int = 5
     support_username: str = ""
     brand_name: str = "VPN"
     webapp_dist: str = ""  # built mini app dir; default: ../webapp/dist next to backend/

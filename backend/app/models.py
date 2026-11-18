@@ -69,6 +69,8 @@ class Server(Base):
     reality_sni: Mapped[str] = mapped_column(String(255))
     reality_sid: Mapped[str] = mapped_column(String(32), default="")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # "direct" — обычная зарубежная локация; "bypass" — вход в РФ для обхода белых списков (каскад)
+    kind: Mapped[str] = mapped_column(String(16), default="direct")
     # PEM of the panel's self-signed TLS cert; pinned when talking to the panel over https
     panel_cert: Mapped[str | None] = mapped_column(Text)
 

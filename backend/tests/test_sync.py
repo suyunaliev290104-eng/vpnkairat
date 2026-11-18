@@ -53,3 +53,22 @@ async def test_sync_expired_user_is_disabled(session, user_factory, server_facto
     p = FakeProvider()
     await sync_user(session, u, p)
     assert p.calls[0][1].enabled is False
+
+
+async def test_bypass_server_gets_daily_limit(session, user_factory, server_factory):
+    await server_factory(host="direct")
+    await server_factory(host="ru", kind="bypass")
+    u = await user_factory()
+    await extend(session, u, 30)
+    p = FakeProvider()
+    await sync_user(session, u, p)
+    by_host = {h: spec for h, spec in p.calls}
+    assert by_host["direct"].total_bytes == 0
+    assert by_host["ru"].total_bytes == 5 * 1024 ** 3
+
+
+async def test_enabled_servers_direct_first(session, server_factory):
+    from app.vpn.sync import enabled_servers
+    await server_factory(host="ru", kind="bypass")
+    await server_factory(host="nl")
+    assert [s.host for s in await enabled_servers(session)] == ["nl", "ru"]
